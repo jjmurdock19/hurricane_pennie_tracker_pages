@@ -1,0 +1,266 @@
+<script>
+(function () {
+  var API_BASE = "https://hurricane-penetrations.josh-f49.workers.dev";
+  var CURRENT_YEAR = new Date().getFullYear();
+
+  var people = [];
+  var selectedPersonId = null;
+
+  var searchInput = document.getElementById("pt-search-input");
+  var searchBtn = document.getElementById("pt-search-btn");
+  var dropdown = document.getElementById("pt-dropdown");
+  var errorBox = document.getElementById("pt-error");
+  var resultBox = document.getElementById("pt-result");
+  var resultName = document.getElementById("pt-result-name");
+  var resultAffil = document.getElementById("pt-result-affil");
+  var resultAllTime = document.getElementById("pt-result-alltime");
+  var seasonList = document.getElementById("pt-season-list");
+  var seasonLbList = document.getElementById("pt-season-lb");
+  var allTimeLbList = document.getElementById("pt-alltime-lb");
+
+  document.getElementById("pt-season-lb-title").textContent = CURRENT_YEAR + " Season Leaderboard";
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.style.display = msg ? "block" : "none";
+  }
+
+  function fullName(p) {
+    return p.first_name + " " + p.last_name;
+  }
+
+  function escapeHtml(str) {
+    var div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function renderLeaderboard(listEl, rows) {
+    listEl.innerHTML = "";
+    if (!rows || rows.length === 0) {
+      listEl.innerHTML = '<li class="pt-empty">No penetrations recorded yet.</li>';
+      return;
+    }
+    rows.forEach(function (row, i) {
+      var li = document.createElement("li");
+      var left = document.createElement("span");
+      left.innerHTML = '<span class="pt-lb-rank">' + (i + 1) + '.</span>' +
+        escapeHtml(row.first_name + " " + row.last_name) +
+        (row.affiliation ? ' <span class="pt-affil">(' + escapeHtml(row.affiliation) + ')</span>' : "");
+      var right = document.createElement("span");
+      right.className = "pt-lb-count";
+      right.textContent = row.total_penetrations;
+      li.appendChild(left);
+      li.appendChild(right);
+      listEl.appendChild(li);
+    });
+  }
+
+  function loadLeaderboards() {
+    fetch(API_BASE + "/leaderboard?year=current&limit=10")
+      .then(function (r) { return r.json(); })
+      .then(function (data) { renderLeaderboard(seasonLbList, data.leaderboard); })
+      .catch(function () { seasonLbList.innerHTML = '<li class="pt-empty">Could not load leaderboard.</li>'; });
+
+    fetch(API_BASE + "/leaderboard?year=all&limit=10")
+      .then(function (r) { return r.json(); })
+      .then(function (data) { renderLeaderboard(allTimeLbList, data.leaderboard); })
+      .catch(function () { allTimeLbList.innerHTML = '<li class="pt-empty">Could not load leaderboard.</li>'; });
+  }
+
+  function loadPeople() {
+    fetch(API_BASE + "/people")
+      .then(function (r) { return r.json(); })
+      .then(function (data) { people = data.people || []; })
+      .catch(function () { showError("Could not load crew roster. Please try again later."); });
+  }
+
+  function hideDropdown() {
+    dropdown.style.display = "none";
+    dropdown.innerHTML = "";
+  }
+
+  function findMatches(q) {
+    return people.filter(function (p) {
+      return fullName(p).toLowerCase().indexOf(q) !== -1;
+    });
+  }
+
+  function renderDropdown(matches, onPick) {
+    dropdown.innerHTML = "";
+    matches.forEach(function (p) {
+      var item = document.createElement("div");
+      item.textContent = fullName(p) + (p.affiliation ? " (" + p.affiliation + ")" : "");
+      item.addEventListener("click", function () {
+        onPick(p);
+        hideDropdown();
+      });
+      dropdown.appendChild(item);
+    });
+    dropdown.style.display = "block";
+  }
+
+  searchInput.addEventListener("input", function () {
+    var q = searchInput.value.trim().toLowerCase();
+    selectedPersonId = null;
+    showError("");
+
+    if (q.length === 0) {
+      hideDropdown();
+      return;
+    }
+
+    var matches = findMatches(q).slice(0, 8);
+
+    if (matches.length === 0) {
+      hideDropdown();
+      return;
+    }
+
+    renderDropdown(matches, function (p) {
+      searchInput.value = fullName(p);
+      selectedPersonId = p.id;
+    });
+  });
+
+  searchInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      searchBtn.click();
+    }
+  });
+
+  document.addEventListener("click", function (e) {
+    if (!dropdown.contains(e.target) && e.target !== searchInput) {
+      hideDropdown();
+    }
+  });
+
+  function renderSeasonBreakdown(rows) {
+    seasonList.innerHTML = "";
+
+    if (!rows || rows.length === 0) {
+      seasonList.innerHTML = '<div class="pt-empty">No penetrations recorded yet.</div>';
+      return;
+    }
+
+    var seasons = {};
+    var order = [];
+    rows.forEach(function (row) {
+      if (!seasons[row.season_year]) {
+        seasons[row.season_year] = { total: 0, storms: [] };
+        order.push(row.season_year);
+      }
+      seasons[row.season_year].total += row.penetration_count;
+      seasons[row.season_year].storms.push(row);
+    });
+    order.sort(function (a, b) { return b - a; });
+
+    order.forEach(function (year, idx) {
+      var season = seasons[year];
+      var details = document.createElement("details");
+      details.className = "pt-season";
+      if (idx === 0) details.open = true;
+
+      var summary = document.createElement("summary");
+      var yearLabel = document.createElement("span");
+      yearLabel.textContent = year;
+      var totalLabel = document.createElement("span");
+      totalLabel.className = "pt-season-total";
+      totalLabel.textContent = season.total;
+      summary.appendChild(yearLabel);
+      summary.appendChild(totalLabel);
+      details.appendChild(summary);
+
+      var ul = document.createElement("ul");
+      ul.className = "pt-storm-list";
+      season.storms.forEach(function (s) {
+        var li = document.createElement("li");
+        var nameSpan = document.createElement("span");
+        nameSpan.textContent = s.storm_name;
+        var countSpan = document.createElement("span");
+        countSpan.className = "pt-storm-count";
+        countSpan.textContent = s.penetration_count;
+        li.appendChild(nameSpan);
+        li.appendChild(countSpan);
+        ul.appendChild(li);
+      });
+      details.appendChild(ul);
+
+      seasonList.appendChild(details);
+    });
+  }
+
+  function loadPerson(id) {
+    showError("");
+    resultBox.style.display = "none";
+
+    Promise.all([
+      fetch(API_BASE + "/people/" + id).then(function (r) { return r.json(); }),
+      fetch(API_BASE + "/people/" + id + "/breakdown").then(function (r) { return r.json(); })
+    ]).then(function (results) {
+      var person = results[0];
+      var breakdownData = results[1];
+
+      if (person.error) {
+        showError("Person not found.");
+        return;
+      }
+
+      var rows = breakdownData.breakdown || [];
+      var allTimeTotal = rows.reduce(function (sum, r) { return sum + r.penetration_count; }, 0);
+
+      resultName.textContent = fullName(person);
+      resultAffil.textContent = person.affiliation || "";
+      resultAllTime.textContent = allTimeTotal;
+      renderSeasonBreakdown(rows);
+      resultBox.style.display = "block";
+    }).catch(function () {
+      showError("Something went wrong fetching that person's data. Please try again.");
+    });
+  }
+
+  searchBtn.addEventListener("click", function () {
+    showError("");
+
+    // A dropdown pick already resolved the person -- load directly.
+    if (selectedPersonId) {
+      hideDropdown();
+      loadPerson(selectedPersonId);
+      return;
+    }
+
+    var q = searchInput.value.trim().toLowerCase();
+    if (q.length === 0) {
+      showError("Type a name to search.");
+      return;
+    }
+
+    var matches = findMatches(q);
+
+    if (matches.length === 0) {
+      hideDropdown();
+      showError("No matching names found.");
+      return;
+    }
+
+    if (matches.length === 1) {
+      selectedPersonId = matches[0].id;
+      searchInput.value = fullName(matches[0]);
+      hideDropdown();
+      loadPerson(selectedPersonId);
+      return;
+    }
+
+    // Multiple matches -- show a pick-list instead of guessing.
+    renderDropdown(matches.slice(0, 20), function (p) {
+      searchInput.value = fullName(p);
+      selectedPersonId = p.id;
+      loadPerson(p.id);
+    });
+  });
+
+  loadPeople();
+  loadLeaderboards();
+})();
+</script>

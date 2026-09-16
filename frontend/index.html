@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+      color: #1c2530;
+    }
+    * { box-sizing: border-box; }
+    .pt-card {
+      background: #ffffff;
+      border: 1px solid #d8dee5;
+      border-radius: 0;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: none;
+    }
+    h2 {
+      margin: 0 0 14px 0;
+      font-size: 18px;
+      color: #0b3d66;
+    }
+    .pt-search-row {
+      display: flex;
+      gap: 8px;
+      position: relative;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 10px 12px;
+      font-size: 15px;
+      border: 1px solid #c2cad3;
+      border-radius: 0;
+      outline: none;
+    }
+    input[type="text"]:focus {
+      border-color: #0b6bb3;
+      box-shadow: none;
+    }
+    button {
+      padding: 10px 18px;
+      font-size: 15px;
+      font-weight: 600;
+      background: #0b6bb3;
+      color: #fff;
+      border: none;
+      border-radius: 0;
+      cursor: pointer;
+    }
+    button:hover { background: #095384; }
+    button:disabled { background: #9fb4c4; cursor: not-allowed; }
+    .pt-dropdown {
+      position: absolute;
+      top: 44px;
+      left: 0;
+      right: 84px;
+      background: #fff;
+      border: 1px solid #c2cad3;
+      border-top: none;
+      max-height: 220px;
+      overflow-y: auto;
+      z-index: 10;
+      box-shadow: none;
+      display: none;
+    }
+    .pt-dropdown div {
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .pt-dropdown div:hover,
+    .pt-dropdown div.pt-active {
+      background: #eaf2f9;
+    }
+    .pt-affil {
+      color: #6b7784;
+      font-size: 12px;
+    }
+    .pt-error {
+      color: #b3261e;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+    .pt-result {
+      margin-top: 16px;
+      display: none;
+    }
+    .pt-result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 1px solid #d8dee5;
+      padding-bottom: 14px;
+      margin-bottom: 14px;
+    }
+    .pt-result-name {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    .pt-result-affil {
+      color: #6b7784;
+      font-size: 13px;
+    }
+    .pt-alltime-block {
+      text-align: right;
+    }
+    .pt-alltime-label {
+      font-size: 12px;
+      color: #6b7784;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .pt-alltime-value {
+      font-size: 26px;
+      font-weight: 700;
+      color: #0b3d66;
+    }
+    .pt-season-list {
+      display: flex;
+      flex-direction: column;
+    }
+    details.pt-season {
+      border-bottom: 1px solid #eef1f4;
+    }
+    details.pt-season:last-child {
+      border-bottom: none;
+    }
+    details.pt-season summary {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 10px 0;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 600;
+      list-style: none;
+    }
+    details.pt-season summary::-webkit-details-marker {
+      display: none;
+    }
+    details.pt-season summary::before {
+      content: "▸";
+      display: inline-block;
+      width: 16px;
+      color: #6b7784;
+    }
+    details.pt-season[open] summary::before {
+      content: "▾";
+    }
+    .pt-season-total {
+      color: #0b6bb3;
+      font-weight: 700;
+      min-width: 3ch;
+      text-align: right;
+    }
+    .pt-storm-list {
+      list-style: none;
+      margin: 0 0 10px 20px;
+      padding: 0;
+    }
+    .pt-storm-list li {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 14px;
+      color: #3a4552;
+      border-bottom: 1px dotted #eef1f4;
+    }
+    .pt-storm-list li:last-child { border-bottom: none; }
+    .pt-storm-count {
+      font-weight: 600;
+      min-width: 3ch;
+      text-align: right;
+    }
+    .pt-leaderboards {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .pt-leaderboard-col {
+      flex: 1 1 320px;
+    }
+    ol.pt-lb-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    ol.pt-lb-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 8px 0;
+      border-bottom: 1px solid #eef1f4;
+      font-size: 14px;
+    }
+    ol.pt-lb-list li:last-child { border-bottom: none; }
+    .pt-lb-rank {
+      display: inline-block;
+      width: 22px;
+      color: #6b7784;
+      font-weight: 600;
+    }
+    .pt-lb-count {
+      font-weight: 700;
+      color: #0b6bb3;
+      min-width: 3ch;
+      text-align: right;
+    }
+    .pt-loading, .pt-empty {
+      color: #6b7784;
+      font-size: 14px;
+      padding: 8px 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="pt-card">
+    <h2>Find a Crew Member</h2>
+    <div class="pt-search-row">
+      <input type="text" id="pt-search-input" placeholder="Start typing a name..." autocomplete="off">
+      <button id="pt-search-btn">Search</button>
+      <div class="pt-dropdown" id="pt-dropdown"></div>
+    </div>
+    <div class="pt-error" id="pt-error" style="display:none;"></div>
+
+    <div class="pt-result" id="pt-result">
+      <div class="pt-result-header">
+        <div>
+          <div class="pt-result-name" id="pt-result-name"></div>
+          <div class="pt-result-affil" id="pt-result-affil"></div>
+        </div>
+        <div class="pt-alltime-block">
+          <div class="pt-alltime-label">All-Time</div>
+          <div class="pt-alltime-value" id="pt-result-alltime">-</div>
+        </div>
+      </div>
+      <div class="pt-season-list" id="pt-season-list"></div>
+    </div>
+  </div>
+
+  <div class="pt-leaderboards">
+    <div class="pt-card pt-leaderboard-col">
+      <h2 id="pt-season-lb-title">Season Leaderboard</h2>
+      <ol class="pt-lb-list" id="pt-season-lb"><li class="pt-loading">Loading...</li></ol>
+    </div>
+    <div class="pt-card pt-leaderboard-col">
+      <h2>All-Time Leaderboard</h2>
+      <ol class="pt-lb-list" id="pt-alltime-lb"><li class="pt-loading">Loading...</li></ol>
+    </div>
+  </div>
+
+  <?!= include('JavaScript'); ?>
+</body>
+</html>
