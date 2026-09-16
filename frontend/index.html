@@ -190,6 +190,8 @@
       list-style: none;
       margin: 0;
       padding: 0;
+      max-height: 370px;
+      overflow-y: auto;
     }
     ol.pt-lb-list li {
       display: flex;
@@ -247,11 +249,15 @@
 
   <div class="pt-leaderboards">
     <div class="pt-card pt-leaderboard-col">
-      <h2 id="pt-season-lb-title">Season Leaderboard</h2>
+      <h2 id="pt-season-lb-title">Season Counts</h2>
       <ol class="pt-lb-list" id="pt-season-lb"><li class="pt-loading">Loading...</li></ol>
     </div>
     <div class="pt-card pt-leaderboard-col">
-      <h2>All-Time Leaderboard</h2>
+      <h2 id="pt-fiscal-lb-title">Fiscal Year Counts</h2>
+      <ol class="pt-lb-list" id="pt-fiscal-lb"><li class="pt-loading">Loading...</li></ol>
+    </div>
+    <div class="pt-card pt-leaderboard-col">
+      <h2>All-Time Counts</h2>
       <ol class="pt-lb-list" id="pt-alltime-lb"><li class="pt-loading">Loading...</li></ol>
     </div>
   </div>

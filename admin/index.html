@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+      color: #1c2530;
+    }
+    * { box-sizing: border-box; }
+    .pt-card {
+      background: #ffffff;
+      border: 1px solid #d8dee5;
+      border-radius: 0;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: none;
+    }
+    h2 {
+      margin: 0 0 14px 0;
+      font-size: 18px;
+      color: #0b3d66;
+    }
+    .pt-search-row {
+      display: flex;
+      gap: 8px;
+      position: relative;
+    }
+    input[type="text"],
+    input[type="password"],
+    input[type="number"],
+    input[type="date"],
+    select {
+      flex: 1;
+      padding: 10px 12px;
+      font-size: 15px;
+      border: 1px solid #c2cad3;
+      border-radius: 0;
+      outline: none;
+      font-family: inherit;
+      background: #fff;
+    }
+    input:focus, select:focus {
+      border-color: #0b6bb3;
+      box-shadow: none;
+    }
+    button {
+      padding: 10px 18px;
+      font-size: 15px;
+      font-weight: 600;
+      background: #0b6bb3;
+      color: #fff;
+      border: none;
+      border-radius: 0;
+      cursor: pointer;
+    }
+    button:hover { background: #095384; }
+    button:disabled { background: #9fb4c4; cursor: not-allowed; }
+    .pt-dropdown {
+      position: absolute;
+      top: 44px;
+      left: 0;
+      right: 0;
+      background: #fff;
+      border: 1px solid #c2cad3;
+      border-top: none;
+      max-height: 220px;
+      overflow-y: auto;
+      z-index: 10;
+      box-shadow: none;
+      display: none;
+    }
+    .pt-dropdown div {
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .pt-dropdown div:hover,
+    .pt-dropdown div.pt-active {
+      background: #eaf2f9;
+    }
+    .pt-error {
+      color: #b3261e;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+    .pt-success {
+      color: #14804a;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+    .pt-field {
+      margin-bottom: 12px;
+    }
+    .pt-field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #3a4552;
+      margin-bottom: 4px;
+    }
+    .pt-field-row {
+      display: flex;
+      gap: 12px;
+    }
+    .pt-field-row .pt-field {
+      flex: 1;
+    }
+    .pt-hint {
+      color: #6b7784;
+      font-size: 12px;
+      margin-top: -6px;
+      margin-bottom: 12px;
+    }
+    #pt-admin-pane {
+      display: none;
+    }
+    #pt-logout {
+      background: none;
+      color: #6b7784;
+      font-weight: 400;
+      padding: 6px 0;
+      text-decoration: underline;
+      float: right;
+    }
+    #pt-logout:hover { background: none; color: #1c2530; }
+    .pt-chip-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .pt-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #eaf2f9;
+      border: 1px solid #c7dced;
+      padding: 4px 6px 4px 10px;
+      font-size: 13px;
+      color: #0b3d66;
+    }
+    .pt-chip button {
+      background: none;
+      border: none;
+      color: #6b7784;
+      font-size: 15px;
+      line-height: 1;
+      padding: 0 2px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .pt-chip button:hover { color: #b3261e; background: none; }
+    .pt-checkbox-field {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .pt-checkbox-field input {
+      flex: none;
+      width: auto;
+    }
+    .pt-checkbox-field label {
+      margin-bottom: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="pt-card" id="pt-pw-pane">
+    <h2>Admin Access</h2>
+    <div class="pt-search-row">
+      <input type="password" id="pt-pw-input" placeholder="Password" autocomplete="off">
+      <button id="pt-pw-btn">Enter</button>
+    </div>
+    <div class="pt-error" id="pt-pw-error" style="display:none;"></div>
+  </div>
+
+  <div id="pt-admin-pane">
+
+    <button id="pt-logout">Log out</button>
+
+    <div class="pt-card">
+      <h2>Add Person</h2>
+      <div class="pt-field-row">
+        <div class="pt-field">
+          <label for="pt-person-first">First name</label>
+          <input type="text" id="pt-person-first" autocomplete="off">
+        </div>
+        <div class="pt-field">
+          <label for="pt-person-last">Last name</label>
+          <input type="text" id="pt-person-last" autocomplete="off">
+        </div>
+      </div>
+      <div class="pt-field">
+        <label for="pt-person-affil">Affiliation (optional)</label>
+        <input type="text" id="pt-person-affil" autocomplete="off">
+      </div>
+      <button id="pt-person-btn">Add Person</button>
+      <div class="pt-error" id="pt-person-error" style="display:none;"></div>
+      <div class="pt-success" id="pt-person-success" style="display:none;"></div>
+    </div>
+
+    <div class="pt-card">
+      <h2>Edit Person</h2>
+      <div class="pt-field">
+        <label for="pt-edit-person-input">Find person</label>
+        <div class="pt-search-row">
+          <input type="text" id="pt-edit-person-input" placeholder="Start typing a name..." autocomplete="off">
+          <div class="pt-dropdown" id="pt-edit-person-dropdown"></div>
+        </div>
+      </div>
+      <div id="pt-edit-person-form" style="display:none;">
+        <div class="pt-field-row">
+          <div class="pt-field">
+            <label for="pt-edit-first">First name</label>
+            <input type="text" id="pt-edit-first" autocomplete="off">
+          </div>
+          <div class="pt-field">
+            <label for="pt-edit-last">Last name</label>
+            <input type="text" id="pt-edit-last" autocomplete="off">
+          </div>
+        </div>
+        <div class="pt-field">
+          <label for="pt-edit-affil">Affiliation</label>
+          <input type="text" id="pt-edit-affil" autocomplete="off">
+        </div>
+        <div class="pt-checkbox-field">
+          <input type="checkbox" id="pt-edit-active">
+          <label for="pt-edit-active">Active</label>
+        </div>
+        <button id="pt-edit-save-btn">Save Changes</button>
+      </div>
+      <div class="pt-error" id="pt-edit-error" style="display:none;"></div>
+      <div class="pt-success" id="pt-edit-success" style="display:none;"></div>
+    </div>
+
+    <div class="pt-card">
+      <h2>Add Storm</h2>
+      <div class="pt-field-row">
+        <div class="pt-field">
+          <label for="pt-storm-name">Name</label>
+          <input type="text" id="pt-storm-name" autocomplete="off">
+        </div>
+        <div class="pt-field">
+          <label for="pt-storm-year">Season year</label>
+          <input type="number" id="pt-storm-year" placeholder="2026">
+        </div>
+      </div>
+      <button id="pt-storm-btn">Add Storm</button>
+      <div class="pt-error" id="pt-storm-error" style="display:none;"></div>
+      <div class="pt-success" id="pt-storm-success" style="display:none;"></div>
+    </div>
+
+    <div class="pt-card">
+      <h2>Add Mission</h2>
+      <div class="pt-field">
+        <label for="pt-mission-storm">Storm</label>
+        <select id="pt-mission-storm"><option value="">Loading storms...</option></select>
+      </div>
+      <div class="pt-field-row">
+        <div class="pt-field">
+          <label for="pt-mission-flight">Flight designation (optional)</label>
+          <input type="text" id="pt-mission-flight" autocomplete="off">
+        </div>
+        <div class="pt-field">
+          <label for="pt-mission-date">Mission date (optional)</label>
+          <input type="date" id="pt-mission-date">
+        </div>
+      </div>
+      <button id="pt-mission-btn">Add Mission</button>
+      <div class="pt-error" id="pt-mission-error" style="display:none;"></div>
+      <div class="pt-success" id="pt-mission-success" style="display:none;"></div>
+    </div>
+
+    <div class="pt-card">
+      <h2>Log Penetrations</h2>
+      <div class="pt-field">
+        <label for="pt-pen-storm">Storm</label>
+        <select id="pt-pen-storm"><option value="">Loading storms...</option></select>
+      </div>
+      <div class="pt-field">
+        <label for="pt-pen-mission">Mission</label>
+        <select id="pt-pen-mission"><option value="">Select a storm first</option></select>
+      </div>
+      <div class="pt-field">
+        <label for="pt-pen-person-input">People</label>
+        <div class="pt-search-row">
+          <input type="text" id="pt-pen-person-input" placeholder="Start typing a name..." autocomplete="off">
+          <div class="pt-dropdown" id="pt-pen-person-dropdown"></div>
+        </div>
+        <div class="pt-chip-list" id="pt-pen-chip-list"></div>
+      </div>
+      <div class="pt-field">
+        <label for="pt-pen-count">Penetration count</label>
+        <input type="number" id="pt-pen-count" min="0" step="1" value="1">
+      </div>
+      <button id="pt-pen-btn">Log Penetrations</button>
+      <div class="pt-error" id="pt-pen-error" style="display:none;"></div>
+      <div class="pt-success" id="pt-pen-success" style="display:none;"></div>
+    </div>
+
+  </div>
+
+  <?!= include('JavaScript'); ?>
+</body>
+</html>

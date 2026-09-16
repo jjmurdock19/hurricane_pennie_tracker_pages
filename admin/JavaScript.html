@@ -1,0 +1,486 @@
+<script>
+(function () {
+  var API_BASE = "https://hurricane-penetrations.josh-f49.workers.dev";
+
+  var adminToken = null; // held in memory only; never persisted to storage
+  var people = [];
+  var selectedPeople = []; // for Log Penetrations: { id, first_name, last_name, affiliation }
+  var editingPersonId = null;
+
+  // ---- Password gate ----------------------------------------------------
+
+  var pwPane = document.getElementById("pt-pw-pane");
+  var pwInput = document.getElementById("pt-pw-input");
+  var pwBtn = document.getElementById("pt-pw-btn");
+  var pwError = document.getElementById("pt-pw-error");
+  var adminPane = document.getElementById("pt-admin-pane");
+  var logoutBtn = document.getElementById("pt-logout");
+
+  function showPwError(msg) {
+    pwError.textContent = msg;
+    pwError.style.display = msg ? "block" : "none";
+  }
+
+  function attemptLogin() {
+    var pw = pwInput.value;
+    if (!pw) {
+      showPwError("Enter the admin password.");
+      return;
+    }
+    pwBtn.disabled = true;
+    showPwError("");
+    google.script.run
+      .withSuccessHandler(function (token) {
+        pwBtn.disabled = false;
+        adminToken = token;
+        pwInput.value = "";
+        pwPane.style.display = "none";
+        adminPane.style.display = "block";
+        loadStorms();
+        loadPeople();
+      })
+      .withFailureHandler(function (err) {
+        pwBtn.disabled = false;
+        showPwError(err && err.message ? err.message : "Login failed.");
+      })
+      .checkPassword(pw);
+  }
+
+  pwBtn.addEventListener("click", attemptLogin);
+  pwInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      attemptLogin();
+    }
+  });
+
+  logoutBtn.addEventListener("click", function () {
+    adminToken = null;
+    adminPane.style.display = "none";
+    pwPane.style.display = "block";
+    pwInput.focus();
+  });
+
+  // ---- Shared helpers -----------------------------------------------------
+
+  function adminFetch(path, body) {
+    return fetch(API_BASE + path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Admin-Token": adminToken
+      },
+      body: JSON.stringify(body)
+    }).then(function (r) {
+      return r.json().then(function (data) {
+        if (!r.ok) throw new Error(data.error || "Request failed (" + r.status + ")");
+        return data;
+      });
+    });
+  }
+
+  function showStatus(errEl, okEl, msg, isError) {
+    errEl.style.display = isError && msg ? "block" : "none";
+    errEl.textContent = isError ? msg : "";
+    okEl.style.display = !isError && msg ? "block" : "none";
+    okEl.textContent = !isError ? msg : "";
+  }
+
+  function fullName(p) {
+    return p.first_name + " " + p.last_name;
+  }
+
+  // ---- Add Person -----------------------------------------------------
+
+  var personFirst = document.getElementById("pt-person-first");
+  var personLast = document.getElementById("pt-person-last");
+  var personAffil = document.getElementById("pt-person-affil");
+  var personBtn = document.getElementById("pt-person-btn");
+  var personError = document.getElementById("pt-person-error");
+  var personSuccess = document.getElementById("pt-person-success");
+
+  personBtn.addEventListener("click", function () {
+    showStatus(personError, personSuccess, "", false);
+    var first = personFirst.value.trim();
+    var last = personLast.value.trim();
+    if (!first || !last) {
+      showStatus(personError, personSuccess, "First and last name are required.", true);
+      return;
+    }
+    personBtn.disabled = true;
+    adminFetch("/admin/people", {
+      first_name: first,
+      last_name: last,
+      affiliation: personAffil.value.trim() || null
+    }).then(function (data) {
+      personBtn.disabled = false;
+      showStatus(personError, personSuccess, "Added " + first + " " + last + " (id " + data.id + ").", false);
+      personFirst.value = "";
+      personLast.value = "";
+      personAffil.value = "";
+      loadPeople();
+    }).catch(function (err) {
+      personBtn.disabled = false;
+      showStatus(personError, personSuccess, err.message, true);
+    });
+  });
+
+  // ---- Edit Person -----------------------------------------------------
+
+  var editPersonInput = document.getElementById("pt-edit-person-input");
+  var editPersonDropdown = document.getElementById("pt-edit-person-dropdown");
+  var editPersonForm = document.getElementById("pt-edit-person-form");
+  var editFirst = document.getElementById("pt-edit-first");
+  var editLast = document.getElementById("pt-edit-last");
+  var editAffil = document.getElementById("pt-edit-affil");
+  var editActive = document.getElementById("pt-edit-active");
+  var editSaveBtn = document.getElementById("pt-edit-save-btn");
+  var editError = document.getElementById("pt-edit-error");
+  var editSuccess = document.getElementById("pt-edit-success");
+
+  function hideEditPersonDropdown() {
+    editPersonDropdown.style.display = "none";
+    editPersonDropdown.innerHTML = "";
+  }
+
+  editPersonInput.addEventListener("input", function () {
+    var q = editPersonInput.value.trim().toLowerCase();
+    if (!q) { hideEditPersonDropdown(); return; }
+
+    var matches = people.filter(function (p) {
+      return fullName(p).toLowerCase().indexOf(q) !== -1;
+    }).slice(0, 8);
+
+    if (!matches.length) { hideEditPersonDropdown(); return; }
+
+    editPersonDropdown.innerHTML = "";
+    matches.forEach(function (p) {
+      var item = document.createElement("div");
+      item.textContent = fullName(p) + (p.affiliation ? " (" + p.affiliation + ")" : "");
+      item.addEventListener("click", function () {
+        editPersonInput.value = fullName(p);
+        hideEditPersonDropdown();
+        loadPersonForEdit(p.id);
+      });
+      editPersonDropdown.appendChild(item);
+    });
+    editPersonDropdown.style.display = "block";
+  });
+
+  document.addEventListener("click", function (e) {
+    if (!editPersonDropdown.contains(e.target) && e.target !== editPersonInput) {
+      hideEditPersonDropdown();
+    }
+  });
+
+  function loadPersonForEdit(id) {
+    showStatus(editError, editSuccess, "", false);
+    fetch(API_BASE + "/people/" + id)
+      .then(function (r) { return r.json(); })
+      .then(function (person) {
+        if (person.error) {
+          showStatus(editError, editSuccess, "Could not load that person.", true);
+          return;
+        }
+        editingPersonId = person.id;
+        editFirst.value = person.first_name || "";
+        editLast.value = person.last_name || "";
+        editAffil.value = person.affiliation || "";
+        editActive.checked = !!person.active;
+        editPersonForm.style.display = "block";
+      }).catch(function () {
+        showStatus(editError, editSuccess, "Could not load that person.", true);
+      });
+  }
+
+  editSaveBtn.addEventListener("click", function () {
+    showStatus(editError, editSuccess, "", false);
+    var first = editFirst.value.trim();
+    var last = editLast.value.trim();
+    if (!editingPersonId) {
+      showStatus(editError, editSuccess, "Pick a person to edit first.", true);
+      return;
+    }
+    if (!first || !last) {
+      showStatus(editError, editSuccess, "First and last name are required.", true);
+      return;
+    }
+    editSaveBtn.disabled = true;
+    adminFetch("/admin/people/" + editingPersonId, {
+      first_name: first,
+      last_name: last,
+      affiliation: editAffil.value.trim() || null,
+      active: editActive.checked
+    }).then(function () {
+      editSaveBtn.disabled = false;
+      showStatus(editError, editSuccess, "Saved changes for " + first + " " + last + ".", false);
+      loadPeople();
+    }).catch(function (err) {
+      editSaveBtn.disabled = false;
+      showStatus(editError, editSuccess, err.message, true);
+    });
+  });
+
+  // ---- Add Storm -----------------------------------------------------
+
+  var stormName = document.getElementById("pt-storm-name");
+  var stormYear = document.getElementById("pt-storm-year");
+  var stormBtn = document.getElementById("pt-storm-btn");
+  var stormError = document.getElementById("pt-storm-error");
+  var stormSuccess = document.getElementById("pt-storm-success");
+
+  stormBtn.addEventListener("click", function () {
+    showStatus(stormError, stormSuccess, "", false);
+    var name = stormName.value.trim();
+    var year = parseInt(stormYear.value, 10);
+    if (!name || !year) {
+      showStatus(stormError, stormSuccess, "Name and season year are required.", true);
+      return;
+    }
+    stormBtn.disabled = true;
+    adminFetch("/admin/storms", { name: name, season_year: year }).then(function (data) {
+      stormBtn.disabled = false;
+      showStatus(stormError, stormSuccess, "Added " + name + " (id " + data.id + ").", false);
+      stormName.value = "";
+      stormYear.value = "";
+      loadStorms();
+    }).catch(function (err) {
+      stormBtn.disabled = false;
+      showStatus(stormError, stormSuccess, err.message, true);
+    });
+  });
+
+  // ---- Storm dropdowns (shared by Add Mission + Log Penetrations) -----
+
+  var missionStormSelect = document.getElementById("pt-mission-storm");
+  var penStormSelect = document.getElementById("pt-pen-storm");
+  var penMissionSelect = document.getElementById("pt-pen-mission");
+
+  function populateStormSelect(select, storms) {
+    select.innerHTML = "";
+    if (!storms.length) {
+      select.innerHTML = '<option value="">No storms yet</option>';
+      return;
+    }
+    var placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Select a storm...";
+    select.appendChild(placeholder);
+    storms.forEach(function (s) {
+      var opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = s.name + " (" + s.season_year + ")";
+      select.appendChild(opt);
+    });
+  }
+
+  function loadStorms() {
+    fetch(API_BASE + "/storms").then(function (r) { return r.json(); }).then(function (data) {
+      var storms = data.storms || [];
+      populateStormSelect(missionStormSelect, storms);
+      populateStormSelect(penStormSelect, storms);
+    }).catch(function () {
+      missionStormSelect.innerHTML = '<option value="">Could not load storms</option>';
+      penStormSelect.innerHTML = '<option value="">Could not load storms</option>';
+    });
+  }
+
+  // ---- Add Mission -----------------------------------------------------
+
+  var missionFlight = document.getElementById("pt-mission-flight");
+  var missionDate = document.getElementById("pt-mission-date");
+  var missionBtn = document.getElementById("pt-mission-btn");
+  var missionError = document.getElementById("pt-mission-error");
+  var missionSuccess = document.getElementById("pt-mission-success");
+
+  missionBtn.addEventListener("click", function () {
+    showStatus(missionError, missionSuccess, "", false);
+    var stormId = missionStormSelect.value;
+    if (!stormId) {
+      showStatus(missionError, missionSuccess, "Pick a storm.", true);
+      return;
+    }
+    missionBtn.disabled = true;
+    adminFetch("/admin/missions", {
+      storm_id: Number(stormId),
+      flight_designation: missionFlight.value.trim() || null,
+      mission_date: missionDate.value || null
+    }).then(function (data) {
+      missionBtn.disabled = false;
+      showStatus(missionError, missionSuccess, "Added mission (id " + data.id + ").", false);
+      missionFlight.value = "";
+      missionDate.value = "";
+      if (penStormSelect.value === stormId) loadMissionsForStorm(stormId);
+    }).catch(function (err) {
+      missionBtn.disabled = false;
+      showStatus(missionError, missionSuccess, err.message, true);
+    });
+  });
+
+  // ---- Log Penetrations -----------------------------------------------------
+
+  var penPersonInput = document.getElementById("pt-pen-person-input");
+  var penPersonDropdown = document.getElementById("pt-pen-person-dropdown");
+  var penChipList = document.getElementById("pt-pen-chip-list");
+  var penCount = document.getElementById("pt-pen-count");
+  var penBtn = document.getElementById("pt-pen-btn");
+  var penError = document.getElementById("pt-pen-error");
+  var penSuccess = document.getElementById("pt-pen-success");
+
+  function loadMissionsForStorm(stormId) {
+    penMissionSelect.innerHTML = '<option value="">Loading missions...</option>';
+    fetch(API_BASE + "/missions?storm_id=" + encodeURIComponent(stormId))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var missions = data.missions || [];
+        penMissionSelect.innerHTML = "";
+        if (!missions.length) {
+          penMissionSelect.innerHTML = '<option value="">No missions for this storm yet</option>';
+          return;
+        }
+        var placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "Select a mission...";
+        penMissionSelect.appendChild(placeholder);
+        missions.forEach(function (m) {
+          var opt = document.createElement("option");
+          opt.value = m.id;
+          var label = m.mission_date || "(no date)";
+          if (m.flight_designation) label += " - " + m.flight_designation;
+          opt.textContent = label;
+          penMissionSelect.appendChild(opt);
+        });
+      }).catch(function () {
+        penMissionSelect.innerHTML = '<option value="">Could not load missions</option>';
+      });
+  }
+
+  penStormSelect.addEventListener("change", function () {
+    if (penStormSelect.value) {
+      loadMissionsForStorm(penStormSelect.value);
+    } else {
+      penMissionSelect.innerHTML = '<option value="">Select a storm first</option>';
+    }
+  });
+
+  function loadPeople() {
+    fetch(API_BASE + "/people")
+      .then(function (r) { return r.json(); })
+      .then(function (data) { people = data.people || []; })
+      .catch(function () { /* roster search just won't autocomplete */ });
+  }
+
+  function hidePersonDropdown() {
+    penPersonDropdown.style.display = "none";
+    penPersonDropdown.innerHTML = "";
+  }
+
+  function renderChips() {
+    penChipList.innerHTML = "";
+    selectedPeople.forEach(function (p) {
+      var chip = document.createElement("span");
+      chip.className = "pt-chip";
+      var label = document.createElement("span");
+      label.textContent = fullName(p);
+      var remove = document.createElement("button");
+      remove.type = "button";
+      remove.textContent = "×";
+      remove.addEventListener("click", function () {
+        selectedPeople = selectedPeople.filter(function (x) { return x.id !== p.id; });
+        renderChips();
+      });
+      chip.appendChild(label);
+      chip.appendChild(remove);
+      penChipList.appendChild(chip);
+    });
+  }
+
+  penPersonInput.addEventListener("input", function () {
+    var q = penPersonInput.value.trim().toLowerCase();
+    if (!q) { hidePersonDropdown(); return; }
+
+    var selectedIds = selectedPeople.map(function (p) { return p.id; });
+    var matches = people.filter(function (p) {
+      return selectedIds.indexOf(p.id) === -1 && fullName(p).toLowerCase().indexOf(q) !== -1;
+    }).slice(0, 8);
+
+    if (!matches.length) { hidePersonDropdown(); return; }
+
+    penPersonDropdown.innerHTML = "";
+    matches.forEach(function (p) {
+      var item = document.createElement("div");
+      item.textContent = fullName(p) + (p.affiliation ? " (" + p.affiliation + ")" : "");
+      item.addEventListener("click", function () {
+        selectedPeople.push(p);
+        renderChips();
+        penPersonInput.value = "";
+        hidePersonDropdown();
+        penPersonInput.focus();
+      });
+      penPersonDropdown.appendChild(item);
+    });
+    penPersonDropdown.style.display = "block";
+  });
+
+  document.addEventListener("click", function (e) {
+    if (!penPersonDropdown.contains(e.target) && e.target !== penPersonInput) {
+      hidePersonDropdown();
+    }
+  });
+
+  penBtn.addEventListener("click", function () {
+    showStatus(penError, penSuccess, "", false);
+    var missionId = penMissionSelect.value;
+    var count = parseInt(penCount.value, 10);
+
+    if (!penStormSelect.value || !missionId) {
+      showStatus(penError, penSuccess, "Pick a storm and mission.", true);
+      return;
+    }
+    if (!selectedPeople.length) {
+      showStatus(penError, penSuccess, "Add at least one person.", true);
+      return;
+    }
+    if (Number.isNaN(count) || count < 0) {
+      showStatus(penError, penSuccess, "Penetration count must be 0 or more.", true);
+      return;
+    }
+
+    penBtn.disabled = true;
+    var toSubmit = selectedPeople.slice();
+    var succeededIds = [];
+    var failedNames = [];
+
+    function submitNext(i) {
+      if (i >= toSubmit.length) {
+        penBtn.disabled = false;
+        selectedPeople = selectedPeople.filter(function (p) {
+          return succeededIds.indexOf(p.id) === -1;
+        });
+        renderChips();
+        if (failedNames.length === 0) {
+          showStatus(penError, penSuccess, "Logged " + count + " penetration(s) for " + succeededIds.length + " people.", false);
+          penCount.value = "1";
+        } else {
+          showStatus(penError, penSuccess, "Logged for " + succeededIds.length + "; failed for " + failedNames.join(", ") + ".", true);
+        }
+        return;
+      }
+      var p = toSubmit[i];
+      adminFetch("/admin/missions/" + missionId + "/penetrations", {
+        person_id: p.id,
+        penetration_count: count
+      }).then(function () {
+        succeededIds.push(p.id);
+        submitNext(i + 1);
+      }).catch(function () {
+        failedNames.push(fullName(p));
+        submitNext(i + 1);
+      });
+    }
+
+    submitNext(0);
+  });
+
+})();
+</script>

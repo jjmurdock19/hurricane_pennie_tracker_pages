@@ -16,9 +16,17 @@
   var resultAllTime = document.getElementById("pt-result-alltime");
   var seasonList = document.getElementById("pt-season-list");
   var seasonLbList = document.getElementById("pt-season-lb");
+  var fiscalLbList = document.getElementById("pt-fiscal-lb");
   var allTimeLbList = document.getElementById("pt-alltime-lb");
 
-  document.getElementById("pt-season-lb-title").textContent = CURRENT_YEAR + " Season Leaderboard";
+  function currentFiscalYear() {
+    var now = new Date();
+    var month = now.getMonth() + 1; // 1-12
+    return month >= 10 ? now.getFullYear() + 1 : now.getFullYear();
+  }
+
+  document.getElementById("pt-season-lb-title").textContent = CURRENT_YEAR + " Season Counts";
+  document.getElementById("pt-fiscal-lb-title").textContent = "FY" + currentFiscalYear() + " Counts";
 
   function showError(msg) {
     errorBox.textContent = msg;
@@ -57,12 +65,17 @@
   }
 
   function loadLeaderboards() {
-    fetch(API_BASE + "/leaderboard?year=current&limit=10")
+    fetch(API_BASE + "/leaderboard?year=current&limit=100")
       .then(function (r) { return r.json(); })
       .then(function (data) { renderLeaderboard(seasonLbList, data.leaderboard); })
       .catch(function () { seasonLbList.innerHTML = '<li class="pt-empty">Could not load leaderboard.</li>'; });
 
-    fetch(API_BASE + "/leaderboard?year=all&limit=10")
+    fetch(API_BASE + "/leaderboard?year=fiscal&limit=100")
+      .then(function (r) { return r.json(); })
+      .then(function (data) { renderLeaderboard(fiscalLbList, data.leaderboard); })
+      .catch(function () { fiscalLbList.innerHTML = '<li class="pt-empty">Could not load leaderboard.</li>'; });
+
+    fetch(API_BASE + "/leaderboard?year=all&limit=100")
       .then(function (r) { return r.json(); })
       .then(function (data) { renderLeaderboard(allTimeLbList, data.leaderboard); })
       .catch(function () { allTimeLbList.innerHTML = '<li class="pt-empty">Could not load leaderboard.</li>'; });
